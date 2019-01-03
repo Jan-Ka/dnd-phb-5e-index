@@ -1,0 +1,257 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>DND 5e load data</title>
+</head>
+
+<body>
+    <div id="container" onsubmit="return onMainSubmit();">
+        <div id="mainForm">
+            <label for="mainFile">Process file: </label>
+            <input type="file" multiple="multiple" id="mainFile" />
+            <input type="button" id="mainSubmit" value="Submit" />
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/0.5.0/js/sql-optimized.js"></script>
+    <script>
+        var mainFile;
+        var mainSubmit;
+
+        var sql;
+        var db;
+
+        var fileOrder = [
+            "create_tables.sql",
+            "load_data.sql",
+            "PHB Index Improved.json",
+            "DMG Index Improved.json",
+            "PHB Index Original.txt",
+            "DMG Index Original.txt",
+            "PHB Spell Index.txt",
+            "MM Index.txt",
+            "update.sql"
+        ]
+
+        function runJson(fileContent, pub, ver) {
+            var sqlStatementTemplate = function () {
+                var values = [];
+
+                for (var argIndex in arguments) {
+                    if (!arguments.hasOwnProperty(argIndex)) {
+                        continue;
+                    }
+
+                    if (arguments[argIndex] === null) {
+                        values.push("'null'");
+                        continue;
+                    }
+
+                    values.push("'" + arguments[argIndex] + "'");
+                }
+
+                return "INSERT OR IGNORE INTO dnd_index (pubkey, version, entry, idx, idx_text, page, notes) VALUES (" + values.join(", ") + ");"
+            };
+
+            var parsed = JSON.parse(fileContent);
+
+            for (var nodeIndex in parsed) {
+                var node = parsed[nodeIndex];
+                var sql = null;
+                var entry = node.name;
+                var index = "1";
+                var indexText = node.name;
+                var page = null;
+                var note = null;
+
+                if (node.hasOwnProperty("note")) {
+                    if (Array.isArray(node.note)) {
+                        note = node.note.join(";");
+                    } else {
+                        note = node.note;
+                    }
+                }
+
+                if (node.hasOwnProperty("pages")) {
+                    var pages = [];
+
+                    for (var pageIndex in node.pages) {
+                        var nodePage = node.pages[pageIndex];
+
+                        if (typeof (nodePage) === "number" && !isNaN(nodePage)) {
+                            pages.push(nodePage);
+                        } else if (typeof (nodePage) === "string") {
+                            var parts = nodePage.split("-");
+                            var pageNums = parts.map(function (pageNum) {
+                                return parseInt(pageNum);
+                            }).sort(function (a, b) {
+                                return b - a;
+                            });
+
+                            var startPage = pageNums.splice(-1, 1) - 1;
+                            var endPage = pageNums[0] + 1;
+
+                            for (var i = startPage; i < endPage; i++) {
+                                pages.push(i);
+                            }
+                        }
+                    }
+
+                    sql = pages.map(function (pge) {
+                        return sqlStatementTemplate.call(null, pub, ver, entry, index, indexText, pge, note);
+                    }).join("\n");
+
+                    db.run(sql);
+
+                    continue;
+                }
+
+                sql = sqlStatementTemplate.call(null, pub, ver, entry, index, indexText, page, note);
+
+                db.run(sql);
+            }
+        }
+
+        function getJsonTarget(fileBaseName) {
+            fileBaseName = fileBaseName.toLowerCase();
+
+            var pub;
+            var ver;
+
+            if (fileBaseName.indexOf("phb ") > -1) {
+                pub = "phb5e";
+            }
+
+            if (fileBaseName.indexOf("dmg ") > -1) {
+                pub = "dmg5e";
+            }
+
+            if (fileBaseName.indexOf("mm ") > -1) {
+                pub = "mm5e";
+                ver = "original";
+            }
+
+            if (fileBaseName.indexOf("improved") > -1) {
+                ver = "improved";
+            }
+
+            if (fileBaseName.indexOf("original") > -1) {
+                ver = "original";
+            }
+
+            if (fileBaseName.indexOf("spell") > -1) {
+                ver = "spells";
+            }
+
+            return {
+                pub: pub,
+                ver: ver
+            };
+        }
+
+        function processFileContent(fileContent, fileBaseName, ext) {
+            switch (ext) {
+                case "sql":
+                    db.run(fileContent);
+
+                    mainFile.value = null;
+                    break;
+                case "json":
+                    var target = getJsonTarget(fileBaseName);
+
+                    runJson(fileContent, target.pub, target.ver);
+
+                    mainFile.value = null;
+                    break;
+                case "txt":
+                    break;
+                default:
+                    console.log("Unsupported extension: " + ext);
+                    return;
+            }
+        }
+
+        function loadFile(file) {
+            var fileReader = new FileReader();
+            var fileNameParts = file.name.split(".");
+            var fileBaseName = fileNameParts[0];
+
+            // ignore dot files
+            if (fileBaseName.length <= 0) {
+                return;
+            }
+
+            var ext = fileNameParts.splice(-1, 1)[0].toLowerCase();
+
+            fileReader.onload = function () {
+                var fileContent = fileReader.result;
+
+                processFileContent(fileContent, fileBaseName, ext);
+            };
+
+            fileReader.readAsText(file);
+        }
+
+        function processFileInput() {
+            var input = document.getElementById("mainFile");
+            var files = input.files;
+
+            if (files.length === 0) {
+                console.log("No files selected");
+                return;
+            }
+
+            var fileMap = [];
+
+            // input.files is an array like object
+            for (var fileKey in files) {
+                if (!files.hasOwnProperty(fileKey)) {
+                    continue;
+                }
+
+                fileMap.push({
+                    name: files[fileKey].name,
+                    idx: parseInt(fileKey)
+                });
+            }
+
+            var arrangedFiles = fileOrder.reduce(function (acc, cur) {
+                var foundFiles = fileMap.filter(function (val) {
+                    return val.name === cur;
+                });
+
+                if (foundFiles.length === 0) {
+                    return acc;
+                }
+
+                acc.push(files[foundFiles[0].idx]);
+
+                return acc;
+            }, []);
+
+            for (var fileIndex in arrangedFiles) {
+                loadFile(arrangedFiles[fileIndex]);
+            }
+
+        }
+
+        function onMainSubmitClick(e) {
+            processFileInput();
+        };
+
+        document.addEventListener("DOMContentLoaded", function domContentLoaded() {
+            mainFile = document.getElementById("mainFile");
+            mainSubmit = document.getElementById("mainSubmit");
+
+            sql = window.SQL;
+            db = new sql.Database();
+
+            mainSubmit.addEventListener("click", onMainSubmitClick);
+        });
+    </script>
+</body>
+
+</html>
