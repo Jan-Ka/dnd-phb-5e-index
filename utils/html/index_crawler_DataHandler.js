@@ -145,6 +145,14 @@ DataHandler.prototype.runJson = function runJson(fileContent, pub, ver) {
  * @memberof DataHandler
  * @this DataHandler instance
  */
+DataHandler.prototype.runTxt = function runTxt(fileContent, pub, ver) {
+    return false;
+};
+
+/**
+ * @memberof DataHandler
+ * @this DataHandler instance
+ */
 DataHandler.prototype.processFileContent = function processFileContent(fileContent, fileBaseName, ext) {
     switch (ext) {
         case "sql":
@@ -156,8 +164,7 @@ DataHandler.prototype.processFileContent = function processFileContent(fileConte
 
             return this.runJson(fileContent, target.pub, target.ver);
         case "txt":
-            console.warn("Not yet implemented");
-            return false;
+            return this.runTxt(fileContent, target.pub, target.ver);
         default:
             console.log("Unsupported extension: " + ext);
             return false;
