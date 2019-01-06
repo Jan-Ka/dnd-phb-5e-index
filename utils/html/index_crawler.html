@@ -1,0 +1,47 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>DND 5e index crawler</title>
+</head>
+
+<body>
+    <div id="container" onsubmit="return onMainSubmit();">
+        <header>
+            <h1>DnD 5e index crawler</h1>
+            <div id="stage"></div>
+        </header>
+
+        <div id="mainForm">
+            <label for="mainFile">Process file: </label>
+            <input type="file" multiple="multiple" id="mainFile" />
+            <input type="button" id="mainSubmit" value="Submit" />
+        </div>
+        <div id="setupChecklist">
+            <table id="requiredFilesTable">
+                <thead>
+                    <tr>
+                        <th>
+                            file
+                        </th>
+                        <th>
+                            state
+                        </th>
+                    </tr>
+                </th>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/0.5.0/js/sql-optimized.js"></script>
+    <script src="index_crawler_polyfill.js"></script>
+    <script src="index_crawler_utils.js"></script>
+    <script src="index_crawler_DataHandler.js"></script>
+    <script src="index_crawler.js"></script>
+</body>
+
+</html>
